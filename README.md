@@ -20,10 +20,18 @@ Already installed without a `ref`? Your `pubspec.lock` froze an old commit — r
 The client defaults to the production API. For staging or self-hosted deployments, pass `baseUrl`:
 
 ```dart
-final paylo = Paylo('pk_test_...', baseUrl: 'https://your-staging-api.example.com');
+await Paylo.configure('pk_test_...', baseUrl: 'https://your-staging-api.example.com');
 ```
 
-Use your **publishable** key (`pk_test_…` / `pk_live_…`) in the app — never the secret `sk_` key (Dashboard → Settings → API keys).
+## Before you start (Paylo dashboard)
+
+1. **Publishable key** — copy `pk_test_…` from Settings → API keys. It's the only key that goes in an app; never ship the secret `sk_` key.
+2. **Redirect URLs** — set a default Success and Cancel URL in Settings (a web page or your app's deep link, e.g. `myapp://paylo/success`). **Required**: the SDK doesn't pass its own, and checkouts fail with `success_url and cancel_url are required` until they're set.
+3. **Plans** — create them in Payments (test mode), with the entitlements each one grants (e.g. `pro`).
+4. **Paywall** — design one in Paywalls and **Publish** it.
+5. **Test card** — `4242 4242 4242 4242`, any future date, any CVC.
+
+Checkout opens in the device browser. When the customer comes back, read their access again (`Paylo.hasEntitlement`) — the subscription is active as soon as Stripe confirms the payment, usually within seconds.
 
 ## Quick start — 3 lines
 
@@ -96,39 +104,42 @@ await Paylo.instance.subscribe(
 ### Manage / cancel a subscription
 
 ```dart
-final status = await paylo.customerStatus(user.id);
-final sub = status.activeSubscription;
-if (sub != null) {
-  // Opens the Stripe customer portal (cancel, update card…)
-  await paylo.openPortal(sub.id, returnUrl: 'https://yourapp.com/account');
-}
+// Opens the Stripe customer portal (cancel, update card, invoices).
+// Returns false when there's nothing to manage (no subscription, or a
+// lifetime purchase).
+await Paylo.openManagement();
 ```
+
+`PayloAccountView` already includes this button.
 
 Lower-level building blocks if you want manual control: `paylo.resolvePaywall(...)` (all named parameters), `paylo.getPaywall(devId)`, `paylo.getPaywalls(devId)`, `paylo.logPaywallEvent(...)`, and `PayloPaywall.show(...)` — which accepts a nullable paywall and simply does nothing when it's null.
 
-### Subscriptions
+### Subscriptions (explicit API)
 
 ```dart
 // Opens the branded checkout in the browser
-final sub = await paylo.subscribe(planId: 'pro_monthly', customerId: user.id);
+final sub = await Paylo.instance.subscribe(planId: 'pro_monthly', customerId: Paylo.customerId);
 
 // Gate premium features
-final status = await paylo.customerStatus(user.id);
-if (status.hasActiveSubscription) { /* unlock */ }
+final status = await Paylo.status();
+if (status.hasEntitlement('pro')) { /* unlock */ }
 ```
 
-### One-time payments
+Lifetime access is a plan with interval `one_time`, sold the same way — the customer then stays subscribed for good.
+
+### One-time payments (purchases your server fulfils)
 
 ```dart
-final session = await paylo.checkout(
-  productName: 'Lifetime Access',
-  amount: 4999, // cents
-  description: 'Unlock all features forever',
+final session = await Paylo.instance.checkout(
+  productName: '500 credits',
+  amount: 499, // cents
 );
-final result = await paylo.waitForPayment(session.id);
-if (result.isCompleted) { /* success */ }
+final result = await Paylo.instance.waitForPayment(session.id);
+if (result.isCompleted) { /* credit the user */ }
 ```
+
+A payment session isn't tied to a customer and grants no entitlement — for unlocking features, sell a `one_time` plan instead (see above).
 
 ## API reference
 
-Full REST API docs: [README at the repo root](../../README.md) or https://paylo-six.vercel.app/docs
+Full docs and REST API reference: https://paylo-six.vercel.app/docs
