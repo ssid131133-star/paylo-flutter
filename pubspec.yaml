@@ -1,0 +1,15 @@
+name: paylo
+description: Paylo SDK for Flutter — accept payments and manage subscriptions without app store fees.
+version: 0.9.0
+homepage: https://paylo.dev
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  url_launcher: ^6.2.0
+  package_info_plus: ^8.0.0
+  shared_preferences: ^2.2.0
